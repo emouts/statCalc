@@ -18,7 +18,7 @@ LGPEstatsApp <- function(...){
                 column(width = 1,
                        numericInput("happiness", "Happiness modifier", 
                                     value = 1, min = 1, max = 1.1, step = 0.01)),
-                column(width = 1),
+                column(width = 2),
                 column(width = 1,
                        numericInput("level_out", "Level", 
                                     value = initial.level + 5, min = 1, max = 100))

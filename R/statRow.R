@@ -3,14 +3,12 @@
 statRowUI <- function(id, stat.id){
   ns <- NS(id)
   
-  stat.short <- stat.names.short[stat.id]
   stat.long <- stat.names.long[stat.id]
   
   fluidRow(
     column(width = 1, numericInput(
-      ns("base"), paste("Base", stat.long), 
-      value = base.stats[stat.id], min = base.stats[stat.id], max = base.stats[stat.id]
-    )),
+      ns("base"), paste("Base", stat.long), value = base.stats[stat.id], 
+      min = base.stats[stat.id], max = base.stats[stat.id])),
     column(width = 1, numericInput(
       ns("iv"), paste(stat.long, "IV"), 
       value = 31, min = 31, max = 31)),
@@ -20,6 +18,8 @@ statRowUI <- function(id, stat.id){
     column(width = 1, numericInput(
       ns("stat"), paste(stat.long, "Stat"), 
       value = statCalcFun(stat = stat.id), min = 1)),
+    column(width = 1, actionButton(ns("set_stat"), "I saw this", icon("check"))),
+    column(width = 1, textOutput(ns("last_update"), inline = TRUE)),
     column(width = 1),
     column(width = 2, textOutput(ns("range"), inline = TRUE))
   )
@@ -38,8 +38,6 @@ statRowServer <- function(id, stat.id, level.in, nature.id, happiness, level.out
     id,
     function(input, output, session){
       
-      stat.short <- stat.names.short[stat.id]
-      
       observeEvent({level.in(); nature.id(); happiness()}, {
         freezeReactiveValue(input, "stat")
         updateNumericInput(
@@ -53,7 +51,6 @@ statRowServer <- function(id, stat.id, level.in, nature.id, happiness, level.out
             happiness = happiness()
           )
         )
-        
       }, ignoreInit = TRUE)
       
       observeEvent(input[["stat"]], {
@@ -79,6 +76,11 @@ statRowServer <- function(id, stat.id, level.in, nature.id, happiness, level.out
         }
       }, ignoreInit = TRUE)
       
+      last.update.level <- eventReactive({input[["set_stat"]]; input[["av"]]}, level.in())
+      observeEvent(last.update.level(), {
+        output[["last_update"]] <- renderText(paste("Last updated at level", last.update.level()))
+      })
+      
       stat.range.min <- reactive(
         statCalcFun(
           stat = stat.id,
@@ -90,21 +92,20 @@ statRowServer <- function(id, stat.id, level.in, nature.id, happiness, level.out
         )
       )
       stat.range.max <- reactive(
-        stat.range.min() +
-          level.out() - level.in()
+        stat.range.min() + level.out() - last.update.level()
       )
       stat.range.mean <- reactive(
         round(stat.range.min() + (stat.range.max() - stat.range.min()) / 6)
       )
-      stat.range.render <- reactive(
+      stat.range.render <- reactive({
         if(stat.range.min() < stat.range.max()){
           paste0(stat.range.min(), " - ", stat.range.max(), " [", stat.range.mean(), "]")
         }else{
           paste0("[", stat.range.min(), "]")
         }
-      )
+      })
       output[["range"]] <- renderText(stat.range.render())
-                                      
+      
     }
-      )
+  )
 }
