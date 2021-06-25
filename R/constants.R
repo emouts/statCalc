@@ -1,3 +1,4 @@
+# initialise the effect of each nature (columns) on each stat (rows)
 nature.names <- c("Hardy", "Lonely", "Adamant", "Naughty", "Brave",
                   "Bold", "Docile", "Impish", "Lax", "Relaxed",
                   "Modest", "Mild", "Bashful", "Rash", "Quiet",
@@ -10,5 +11,7 @@ for(i in 1:5){
   nature.effects[i, minuses == i] <- nature.effects[i, minuses == i] / 1.1
 }
 
+# names for input ids
 stat.names.short <- c("hp", "atk", "def", "spatk", "spdef", "speed")
+# names for labels
 stat.names.long <- c("HP", "Attack", "Defense", "Sp.Attack", "Sp.Defense", "Speed")

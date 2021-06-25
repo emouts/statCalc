@@ -1,3 +1,9 @@
+#' @title Module for each stat row
+#' @description Each stat is considered independent of the other stats (the 
+#' calculation does not take into account the total AVs gained across all stats).
+#' The stat is calculated from the level, nature and happiness of the pokemon.
+#' User updates to the stat value affect the IV-AV possible combinations,
+#' which in turn affect the projection of the stat at a later level.
 #' @import shiny
 
 statRowUI <- function(id, stat.id){
@@ -5,6 +11,7 @@ statRowUI <- function(id, stat.id){
   
   stat.long <- stat.names.long[stat.id]
   
+  # set up the layout of the row
   fluidRow(
     column(width = 1, numericInput(
       ns("base"), paste("Base", stat.long), value = base.stats[stat.id], 
@@ -18,6 +25,8 @@ statRowUI <- function(id, stat.id){
     column(width = 1, numericInput(
       ns("stat"), paste(stat.long, "Stat"), 
       value = statCalcFun(stat = stat.id), min = 1)),
+    # this button verifies that the runner saw the expected stat at that level,
+    # distinguishing from the runner not seeing the stat at all
     column(width = 1, actionButton(ns("set_stat"), "I saw this", icon("check"))),
     column(width = 1, textOutput(ns("last_update"), inline = TRUE)),
     column(width = 1),
@@ -38,6 +47,7 @@ statRowServer <- function(id, stat.id, level.in, nature.id, happiness, level.out
     id,
     function(input, output, session){
       
+      # whenever level, nature, or happiness change, update the expected stat
       observeEvent({level.in(); nature.id(); happiness()}, {
         freezeReactiveValue(input, "stat")
         updateNumericInput(
@@ -53,6 +63,8 @@ statRowServer <- function(id, stat.id, level.in, nature.id, happiness, level.out
         )
       }, ignoreInit = TRUE)
       
+      # whenever the stat updates, update the AV (if the stat change was due
+      # to a change in level, nature, or happiness, this does nothing)
       observeEvent(input[["stat"]], {
         new.av.value <- 
           input[["av"]] +
@@ -76,11 +88,14 @@ statRowServer <- function(id, stat.id, level.in, nature.id, happiness, level.out
         }
       }, ignoreInit = TRUE)
       
+      # keep track of the last level when the stat was seen by the runner
       last.update.level <- eventReactive({input[["set_stat"]]; input[["av"]]}, level.in())
       observeEvent(last.update.level(), {
         output[["last_update"]] <- renderText(paste("Last updated at level", last.update.level()))
       })
       
+      # calculate the stat range at the target level; the calculation takes into
+      # account the difference between the target level and last update level
       stat.range.min <- reactive(
         statCalcFun(
           stat = stat.id,
