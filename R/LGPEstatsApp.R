@@ -8,6 +8,7 @@
 #' other useful information is shown, mainly to help the runner avoid 
 #' mistakes with inputs. Note that the app does not prevent invalid states
 #' (e.g. a stat value that is impossible), it is up to the user to avoid that.
+#' @param ... arguments to be passed to other methods
 #' @import shiny
 #' @export
 
@@ -17,70 +18,85 @@ LGPEstatsApp <- function(...){
         
         fluidPage(
             
-            titlePanel("LGPE Eevee stat calculator"),
+            shinyWidgets::setBackgroundColor("ghostwhite"),
             
-            # set up the general input row
-            fluidRow(
-                column(width = 1,
-                       numericInput("level_in", "Level", 
-                                    value = initial.level, min = 1, max = 100)),
-                column(width = 1, selectInput("nature", "Nature", nature.names)),
-                column(width = 1),
-                column(width = 1,
-                       numericInput("happiness", "Happiness modifier", 
-                                    value = 1, min = 1, max = 1.1, step = 0.01)),
-                column(width = 2),
-                column(width = 1,
-                       numericInput("level_out", "Level", 
-                                    value = initial.level + 5, min = 1, max = 100))
-            ),
+            titlePanel("LGPE stat calculator"),
             
-            # set up the 6 stat rows
-            statRowUI("hp_row", 1),
-            statRowUI("atk_row", 2),
-            statRowUI("def_row", 3),
-            statRowUI("spatk_row", 4),
-            statRowUI("spdef_row", 5),
-            statRowUI("speed_row", 6),
-            
-            # show some extra information on total AVs
-            fluidRow(column(2), column(1, textOutput("known_avs"), inline = FALSE)),
-            fluidRow(column(2),
-                column(1, textOutput("unknown_avs"), inline = FALSE),
-                column(2),
-                bookmarkButton())
-            
+            tabsetPanel(tabPanel(
+                "Eevee", 
+                
+                # set up the general input row and names
+                fluidRow(
+                    column(width = 1, tags$strong("Initial level")),
+                    column(width = 1, tags$strong("Level")),
+                    column(width = 2, tags$strong("Nature")),
+                    column(width = 1, tags$strong("Happiness modifier")),
+                    column(width = 1, offset = 1, tags$strong("Target level"))
+                ),
+                
+                fluidRow(
+                    column(width = 1, customStaticButtonConstant(
+                        label = params.list[["eevee"]]$initial.level)),
+                    column(width = 1, inputUpdateButtonUI("level_in")),
+                    column(width = 2, shinyWidgets::pickerInput(
+                        "nature", NULL, nature.named.list, 
+                        options = list(style = "bttn-material-flat bttn-primary")
+                    )),
+                    column(width = 1, inputUpdateButtonUI("happiness")),
+                    column(width = 1, offset = 1, inputUpdateButtonUI("level_out"))
+                ),
+                
+                fluidRow(
+                    column(width = 1, offset = 1, tags$strong("Base")),
+                    column(width = 1, tags$strong("IV")),
+                    column(width = 1, tags$strong("AV")),
+                    column(width = 1, tags$strong("Stat")),
+                    column(width = 1, tags$strong("Last updated")),
+                    column(width = 1, tags$strong("Range [expected]"))
+                ),
+                
+                # set up the 6 stat rows
+                statRowUI("hp_row", "eevee", 1),
+                statRowUI("atk_row", "eevee", 2),
+                statRowUI("def_row", "eevee", 3),
+                statRowUI("spatk_row", "eevee", 4),
+                statRowUI("spdef_row", "eevee", 5),
+                statRowUI("speed_row", "eevee", 6),
+                
+                # show some extra information on total AVs
+                fluidRow(column(1, align = "left", offset = 3, textOutput(
+                    "known_avs", container = customStaticButtonOutputLight))),
+                fluidRow(column(1, align = "left", offset = 3, textOutput(
+                    "unknown_avs", container = customStaticButtonOutputLight)),
+                         column(2),
+                    column(1, bookmarkButton()))
+                
+            ))
         )
         
     }
     
-    server <- function(input, output) {
+    server <- function(input, output, session) {
         
         # set up reactives for the main inputs
-        level.in  <- reactive(input[["level_in"]])
+        level.in  <- inputUpdateButtonServer("level_in", params.list[["eevee"]]$initial.level)
         nature.id <- reactive(match(input[["nature"]], nature.names))
-        happiness <- reactive(input[["happiness"]])
-        level.out <- reactive(input[["level_out"]])
+        happiness <- inputUpdateButtonServer("happiness", 1, 0.01)
+        level.out <- inputUpdateButtonServer("level_out", params.list[["eevee"]]$initial.level + 5)
         
         # run calculations for each stat
-        statRowServer("hp_row", 1, level.in, nature.id, happiness, level.out)
-        statRowServer("atk_row", 2, level.in, nature.id, happiness, level.out)
-        statRowServer("def_row", 3, level.in, nature.id, happiness, level.out)
-        statRowServer("spatk_row", 4, level.in, nature.id, happiness, level.out)
-        statRowServer("spdef_row", 5, level.in, nature.id, happiness, level.out)
-        statRowServer("speed_row", 6, level.in, nature.id, happiness, level.out)
+        hp.av <- statRowServer("hp_row", "eevee", 1, level.in, nature.id, happiness, level.out)
+        atk.av <- statRowServer("atk_row", "eevee", 2, level.in, nature.id, happiness, level.out)
+        def.av <- statRowServer("def_row", "eevee", 3, level.in, nature.id, happiness, level.out)
+        spatk.av <- statRowServer("spatk_row", "eevee", 4, level.in, nature.id, happiness, level.out)
+        spdef.av <- statRowServer("spdef_row", "eevee", 5, level.in, nature.id, happiness, level.out)
+        speed.av <- statRowServer("speed_row", "eevee", 6, level.in, nature.id, happiness, level.out)
         
         # calculate total AVs gained and missing
-        known.avs <- reactive(sum(
-            input[["hp_row-av"]], input[["atk_row-av"]], 
-            input[["def_row-av"]], input[["spatk_row-av"]], 
-            input[["spdef_row-av"]], input[["speed_row-av"]]
-        ))
-        unknown.avs <- reactive(
-            input[["level_in"]] - initial.level - known.avs()
-        )
-        output[["known_avs"]] <- renderText(paste("Known AVs:", known.avs()))
-        output[["unknown_avs"]] <- renderText(paste("Missing AVs:", unknown.avs()))
+        known.avs <- reactive(sum(hp.av(), atk.av(), def.av(), spatk.av(), spdef.av(), speed.av()))
+        unknown.avs <- reactive(level.in() - params.list[["eevee"]]$initial.level - known.avs())
+        output[["known_avs"]] <- renderText(paste("Known:", known.avs()))
+        output[["unknown_avs"]] <- renderText(paste("Missing:", unknown.avs()))
         
     }
     
